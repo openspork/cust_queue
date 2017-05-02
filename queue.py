@@ -1,15 +1,10 @@
 from peewee import *
 from Queue import Queue
 from datetime import datetime
-
-##############################################################################
-#SETUP DB
-##############################################################################
+import atexit
 
 #define database
 database = SqliteDatabase('customers.db')
-#create customer queue
-q = Queue()
 
 #define base model
 class BaseModel(Model):
@@ -21,39 +16,41 @@ class Customer(BaseModel):
 	id = PrimaryKeyField(null = False, unique = True)
 	checkin = TimeField(null = False)
 	checkout = TimeField(null = True)
-	agent = CharField(null = True)
 
-#define Counter DB obj
-class Counter(BaseModel):
-	id = PrimaryKeyField(null = False, unique = True)
-	isBusy = BooleanField(null = False)
+def closedb():
+	database.close()
+	print 'closed db!'
 
 #connects to DB and init tables if not present
 def initialize_db():
 	database.connect() #connect to db
-	database.create_tables([Customer], safe=True) #safe -- will not override
+	database.create_tables([Customer], safe=True) #safe -- will not override if existing
+	atexit.register(closedb) #registers exit handler to close db
+
+def initialize_q():
+	print 'UNPROCESSED:'
+	for unproc_cust in Customer.select().where(Customer.checkout == None).order_by(Customer.checkin.asc()):
+		print 'adding cust' + str(unproc_cust.id) + ' to queue'
+		q.put(unproc_cust)
 
 #inits db
 initialize_db()
 
+#initilize queue
+q = Queue()
+initialize_q()
+
+print 'loaded'
+
 #creates a new db entry and adds to queue
-def new_ticket():
-	q.put_nowait(Customer.create(checkin = datetime.now().time()))
+def new_customer():
+	q.put(Customer.create(checkin = datetime.now().time()))
 
-def open_ticket():
-	print 'opening ticket'
-
-def close_ticket():
-	print q.get().id
-
-counter = Counter()
-
-print counter.isBusy
+def next_customer():
+	cust = q.get()
+	cust.checkout = datetime.now().time()
+	cust.save()
+	print cust.id, cust.checkin, cust.checkout
 
 
-
-''''
-for cust in Customer.select():
-	print cust.id, cust.checkin
-'''
 
