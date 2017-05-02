@@ -6,12 +6,13 @@ import atexit
 #builds queues from DB on start
 def build_queues():
 	for loc in Location.select():
-		print loc.name
+		print 'building ' + loc.name + ' queue'
 		queues[loc.name] = Queue()
 
 	for unproc_cust in Customer.select().where(Customer.checkout == None).order_by(Customer.checkin.asc()):
-		print 'adding cust'  + str(unproc_cust.id) + ' to queue ' + unproc_cust.location.name
+		print 'adding cust '  + str(unproc_cust.id) + ' to queue ' + unproc_cust.location.name + ' with num ' + str(unproc_cust.number)
 		queues[unproc_cust.location.name].put(unproc_cust)
+
 
 def closedb():
 	db.close()
